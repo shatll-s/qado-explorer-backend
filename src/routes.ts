@@ -1,7 +1,8 @@
 import { Router } from 'express'
+import Redis from 'ioredis'
 import { NodeProxy } from './nodeProxy'
 
-export function createRoutes(node: NodeProxy): Router {
+export function createRoutes(node: NodeProxy, redis?: Redis | null): Router {
   const router = Router()
 
   // GET /api/tip — current chain tip
@@ -87,9 +88,16 @@ export function createRoutes(node: NodeProxy): Router {
     }
   })
 
-  // GET /api/stats — computed network stats
+  // GET /api/stats — computed network stats (cached 15s)
   router.get('/stats', async (_req, res) => {
     try {
+      if (redis) {
+        try {
+          const cached = await redis.get('stats')
+          if (cached) { res.json(JSON.parse(cached)); return }
+        } catch {}
+      }
+
       const tip = await node.getTip()
       const tipHeight = parseInt(tip.height)
       const span = Math.min(100, tipHeight)
@@ -117,14 +125,20 @@ export function createRoutes(node: NodeProxy): Router {
       const blockReward = 20 // QADO per block
       const totalSupply = blockReward * tipHeight
 
-      res.json({
+      const stats = {
         avg_block_time: Math.round(avgBlockTime * 10) / 10,
         hashrate: Math.round(hashrate),
         difficulty: Math.round(difficulty),
         total_supply: totalSupply,
         block_reward: blockReward,
         blocks_sampled: span
-      })
+      }
+
+      if (redis) {
+        try { await redis.setex('stats', 15, JSON.stringify(stats)) } catch {}
+      }
+
+      res.json(stats)
     } catch (err: any) {
       res.status(502).json({ error: 'Failed to compute stats', detail: err.message })
     }

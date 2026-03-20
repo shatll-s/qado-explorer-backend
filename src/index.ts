@@ -37,7 +37,7 @@ if (redis) {
 }
 
 const nodeProxy = createNodeProxy(NODE_URL, redis)
-const routes = createRoutes(nodeProxy)
+const routes = createRoutes(nodeProxy, redis)
 app.use('/api', routes)
 
 app.get('/health', (_req, res) => {
