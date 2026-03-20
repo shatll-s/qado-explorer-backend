@@ -11,10 +11,18 @@ const NODE_URL = process.env.QADO_NODE_URL || 'http://localhost:18080'
 const CORS_ORIGIN = process.env.CORS_ORIGIN || '*'
 
 const app = express()
-const redis = new Redis(REDIS_URL)
+const redis = new Redis(REDIS_URL, {
+  maxRetriesPerRequest: 1,
+  retryStrategy(times) {
+    return Math.min(times * 1000, 30000)
+  }
+})
 
+let redisLogged = false
 redis.on('connect', () => console.log(`Redis connected: ${REDIS_URL}`))
-redis.on('error', (err) => console.error('Redis error:', err.message))
+redis.on('error', (err) => {
+  if (!redisLogged) { console.warn(`Redis unavailable: ${err.message} (running without cache)`); redisLogged = true }
+})
 
 app.use(cors({ origin: CORS_ORIGIN }))
 app.use(express.json())

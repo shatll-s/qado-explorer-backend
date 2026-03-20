@@ -11,17 +11,21 @@ export function createRateLimiter(redis: Redis) {
     const ip = req.ip || req.socket.remoteAddress || 'unknown'
     const key = `rl:${ip}`
 
-    const current = await redis.incr(key)
-    if (current === 1) {
-      await redis.expire(key, WINDOW_SEC)
-    }
+    try {
+      const current = await redis.incr(key)
+      if (current === 1) {
+        await redis.expire(key, WINDOW_SEC)
+      }
 
-    res.setHeader('X-RateLimit-Limit', MAX_REQUESTS)
-    res.setHeader('X-RateLimit-Remaining', Math.max(0, MAX_REQUESTS - current))
+      res.setHeader('X-RateLimit-Limit', MAX_REQUESTS)
+      res.setHeader('X-RateLimit-Remaining', Math.max(0, MAX_REQUESTS - current))
 
-    if (current > MAX_REQUESTS) {
-      res.status(429).json({ error: 'Too many requests' })
-      return
+      if (current > MAX_REQUESTS) {
+        res.status(429).json({ error: 'Too many requests' })
+        return
+      }
+    } catch {
+      // Redis down — allow request (no rate limiting)
     }
 
     next()

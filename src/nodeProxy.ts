@@ -20,10 +20,14 @@ export function createNodeProxy(nodeUrl: string, redis: Redis): NodeProxy {
   }
 
   async function cached<T>(key: string, ttlSec: number, fetcher: () => Promise<T>): Promise<T> {
-    const hit = await redis.get(key)
-    if (hit) return JSON.parse(hit)
+    try {
+      const hit = await redis.get(key)
+      if (hit) return JSON.parse(hit)
+    } catch {}
     const data = await fetcher()
-    await redis.setex(key, ttlSec, JSON.stringify(data))
+    try {
+      await redis.setex(key, ttlSec, JSON.stringify(data))
+    } catch {}
     return data
   }
 
