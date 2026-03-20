@@ -11,7 +11,7 @@ export interface NodeProxy {
   getLatestBlocks(count: number): Promise<any[]>
 }
 
-export function createNodeProxy(nodeUrl: string, redis: Redis): NodeProxy {
+export function createNodeProxy(nodeUrl: string, redis: Redis | null): NodeProxy {
   async function nodeGet(path: string): Promise<any> {
     const url = `${nodeUrl}${path}`
     const resp = await fetch(url, { timeout: 10000 })
@@ -20,14 +20,18 @@ export function createNodeProxy(nodeUrl: string, redis: Redis): NodeProxy {
   }
 
   async function cached<T>(key: string, ttlSec: number, fetcher: () => Promise<T>): Promise<T> {
-    try {
-      const hit = await redis.get(key)
-      if (hit) return JSON.parse(hit)
-    } catch {}
+    if (redis) {
+      try {
+        const hit = await redis.get(key)
+        if (hit) return JSON.parse(hit)
+      } catch {}
+    }
     const data = await fetcher()
-    try {
-      await redis.setex(key, ttlSec, JSON.stringify(data))
-    } catch {}
+    if (redis) {
+      try {
+        await redis.setex(key, ttlSec, JSON.stringify(data))
+      } catch {}
+    }
     return data
   }
 
