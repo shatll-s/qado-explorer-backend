@@ -5,6 +5,7 @@ export interface NodeProxy {
   getTip(): Promise<any>
   getBlock(heightOrHash: string): Promise<any>
   getAddress(address: string): Promise<any>
+  getTx(txid: string): Promise<any>
   getTxConfirmations(txid: string): Promise<any>
   getNetwork(): Promise<any>
   getHealth(): Promise<any>
@@ -47,6 +48,10 @@ export function createNodeProxy(nodeUrl: string, redis: Redis | null): NodeProxy
 
     getAddress(address: string) {
       return cached(`addr:${address}`, 10, () => nodeGet(`/v1/address/${address}`))
+    },
+
+    getTx(txid: string) {
+      return cached(`tx-full:${txid}`, 30, () => nodeGet(`/v1/tx/${txid}`))
     },
 
     getTxConfirmations(txid: string) {

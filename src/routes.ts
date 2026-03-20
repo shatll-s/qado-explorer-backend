@@ -80,7 +80,7 @@ export function createRoutes(node: NodeProxy): Router {
         res.status(400).json({ error: 'Invalid txid format (expected 64-char hex)' })
         return
       }
-      const info = await node.getTxConfirmations(txid)
+      const info = await node.getTx(txid)
       res.json(info)
     } catch (err: any) {
       res.status(502).json({ error: 'Failed to fetch transaction', detail: err.message })
