@@ -87,6 +87,49 @@ export function createRoutes(node: NodeProxy): Router {
     }
   })
 
+  // GET /api/stats — computed network stats
+  router.get('/stats', async (_req, res) => {
+    try {
+      const tip = await node.getTip()
+      const tipHeight = parseInt(tip.height)
+      const span = Math.min(100, tipHeight)
+      const oldBlock = await node.getBlock((tipHeight - span).toString())
+      const tipBlock = await node.getBlock(tipHeight.toString())
+
+      const t1 = new Date(oldBlock.timestamp_utc).getTime() / 1000
+      const t2 = new Date(tipBlock.timestamp_utc).getTime() / 1000
+      const timeDiff = t2 - t1
+
+      const avgBlockTime = timeDiff > 0 ? timeDiff / span : 0
+
+      // hashrate from current target: difficulty = 2^256 / target, hashrate = difficulty / avgBlockTime
+      let hashrate = 0
+      let difficulty = 0
+      try {
+        const job = await node.getMiningJob()
+        const target = BigInt('0x' + job.target)
+        if (target > 0n) {
+          difficulty = Number((2n ** 256n) / target)
+          hashrate = avgBlockTime > 0 ? difficulty / avgBlockTime : 0
+        }
+      } catch {}
+
+      const blockReward = 20 // QADO per block
+      const totalSupply = blockReward * tipHeight
+
+      res.json({
+        avg_block_time: Math.round(avgBlockTime * 10) / 10,
+        hashrate: Math.round(hashrate),
+        difficulty: Math.round(difficulty),
+        total_supply: totalSupply,
+        block_reward: blockReward,
+        blocks_sampled: span
+      })
+    } catch (err: any) {
+      res.status(502).json({ error: 'Failed to compute stats', detail: err.message })
+    }
+  })
+
   // GET /api/search?q=... — search by height, hash, address, txid
   router.get('/search', async (req, res) => {
     try {

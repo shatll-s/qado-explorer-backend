@@ -9,6 +9,7 @@ export interface NodeProxy {
   getTxConfirmations(txid: string): Promise<any>
   getNetwork(): Promise<any>
   getHealth(): Promise<any>
+  getMiningJob(): Promise<any>
   getLatestBlocks(count: number): Promise<any[]>
 }
 
@@ -64,6 +65,20 @@ export function createNodeProxy(nodeUrl: string, redis: Redis | null): NodeProxy
 
     getHealth() {
       return cached('health', 10, () => nodeGet('/v1/health'))
+    },
+
+    getMiningJob() {
+      return cached('mining-job', 5, async () => {
+        const url = `${nodeUrl}/v1/mining/job`
+        const resp = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ miner: '0'.repeat(63) + '1' }),
+          timeout: 10000
+        })
+        if (!resp.ok) throw new Error(`Node /v1/mining/job: ${resp.status}`)
+        return resp.json()
+      })
     },
 
     async getLatestBlocks(count: number) {
