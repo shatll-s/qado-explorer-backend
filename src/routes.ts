@@ -73,7 +73,23 @@ export function createRoutes(node: NodeProxy, redis?: Redis | null): Router {
     }
   })
 
-  // GET /api/tx/:txid — transaction confirmations
+  // GET /api/address/:addr/incoming — incoming transactions with cursor pagination
+  router.get('/address/:addr/incoming', async (req, res) => {
+    try {
+      const addr = req.params.addr.toLowerCase()
+      if (!/^[0-9a-f]{64}$/.test(addr)) {
+        res.status(400).json({ error: 'Invalid address format (expected 64-char hex)' })
+        return
+      }
+      const cursor = req.query.cursor as string | undefined
+      const data = await node.getAddressIncoming(addr, cursor)
+      res.json(data)
+    } catch (err: any) {
+      res.status(502).json({ error: 'Failed to fetch incoming transactions', detail: err.message })
+    }
+  })
+
+  // GET /api/tx/:txid — transaction info (with optional block_ref for coinbase disambiguation)
   router.get('/tx/:txid', async (req, res) => {
     try {
       const txid = req.params.txid.toLowerCase()
@@ -81,7 +97,8 @@ export function createRoutes(node: NodeProxy, redis?: Redis | null): Router {
         res.status(400).json({ error: 'Invalid txid format (expected 64-char hex)' })
         return
       }
-      const info = await node.getTx(txid)
+      const blockRef = req.query.block_ref as string | undefined
+      const info = await node.getTx(txid, blockRef)
       res.json(info)
     } catch (err: any) {
       res.status(502).json({ error: 'Failed to fetch transaction', detail: err.message })

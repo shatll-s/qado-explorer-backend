@@ -5,7 +5,8 @@ export interface NodeProxy {
   getTip(): Promise<any>
   getBlock(heightOrHash: string): Promise<any>
   getAddress(address: string): Promise<any>
-  getTx(txid: string): Promise<any>
+  getAddressIncoming(address: string, cursor?: string): Promise<any>
+  getTx(txid: string, blockRef?: string): Promise<any>
   getTxConfirmations(txid: string): Promise<any>
   getNetwork(): Promise<any>
   getHealth(): Promise<any>
@@ -51,8 +52,19 @@ export function createNodeProxy(nodeUrl: string, redis: Redis | null): NodeProxy
       return cached(`addr:${address}`, 10, () => nodeGet(`/v1/address/${address}`))
     },
 
-    getTx(txid: string) {
-      return cached(`tx-full:${txid}`, 30, () => nodeGet(`/v1/tx/${txid}`))
+    getAddressIncoming(address: string, cursor?: string, limit = 1000) {
+      const params = new URLSearchParams()
+      if (cursor) params.set('cursor', cursor)
+      params.set('limit', String(limit))
+      const qs = params.toString()
+      const key = `addr-incoming:${address}:${cursor || 'first'}`
+      return cached(key, 10, () => nodeGet(`/v1/address/${address}/incoming?${qs}`))
+    },
+
+    getTx(txid: string, blockRef?: string) {
+      const qs = blockRef ? `?block_ref=${blockRef}` : ''
+      const key = blockRef ? `tx-full:${txid}:${blockRef}` : `tx-full:${txid}`
+      return cached(key, 30, () => nodeGet(`/v1/tx/${txid}${qs}`))
     },
 
     getTxConfirmations(txid: string) {
